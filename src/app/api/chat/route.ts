@@ -6,7 +6,7 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-// Set the runtime to edge for best performance
+// IMPORTANT! Set the runtime to edge
 export const runtime = 'edge';
 
 export async function POST(req: Request) {
@@ -18,25 +18,17 @@ export async function POST(req: Request) {
       model: model || 'gpt-3.5-turbo',
       stream: true,
       temperature: temperature || 0.7,
-      messages: messages.map((message: { role: string; content: string }) => ({
-        role: message.role,
-        content: message.content,
-      })),
+      messages,
     });
 
-    // Convert the response into a friendly text-stream
+    // Transform the response into a friendly text-stream
     const stream = OpenAIStream(response);
 
-    // Respond with the stream
+    // Return a StreamingTextResponse, which can be consumed by the client
     return new StreamingTextResponse(stream);
   } catch (error) {
-    if (error instanceof Error) {
-      return new Response(JSON.stringify({ error: error.message }), {
-        status: 500,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    }
-    return new Response(JSON.stringify({ error: 'An unknown error occurred' }), {
+    console.error('Chat API Error:', error);
+    return new Response(JSON.stringify({ error: 'There was an error processing your request' }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },
     });
