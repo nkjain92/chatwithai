@@ -53,6 +53,10 @@ export const ChatInterface = () => {
     handleSubmit(e);
   };
 
+  const handleRetry = () => {
+    reload();
+  };
+
   return (
     <div className='flex flex-col h-full'>
       <div className='flex-1 p-4 overflow-auto'>
@@ -74,7 +78,7 @@ export const ChatInterface = () => {
             <Alert variant='destructive'>
               <AlertCircle className='h-4 w-4' />
               <AlertDescription>{error.message}</AlertDescription>
-              <Button variant='outline' size='sm' className='ml-2' onClick={reload}>
+              <Button variant='outline' size='sm' className='ml-2' onClick={handleRetry}>
                 <RefreshCw className='h-4 w-4 mr-1' />
                 Retry
               </Button>

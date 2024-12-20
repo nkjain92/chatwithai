@@ -1,27 +1,26 @@
-import { OpenAIStream, StreamingTextResponse } from 'ai';
-import OpenAI from 'openai';
-
-// Create an OpenAI API client (edge-compatible)
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY!,
-});
+import { openai } from '@ai-sdk/openai';
+import { streamText } from 'ai';
 
 // Set the runtime to edge
 export const runtime = 'edge';
 
 export async function POST(req: Request) {
-  const { messages } = await req.json();
+  try {
+    const { messages } = await req.json();
 
-  // Ask OpenAI for a streaming chat completion
-  const response = await openai.chat.completions.create({
-    model: 'gpt-3.5-turbo',
-    stream: true,
-    messages,
-  });
+    // Create a text stream using the Vercel AI SDK
+    const { textStream } = await streamText({
+      model: openai('gpt-3.5-turbo'),
+      messages,
+    });
 
-  // Convert the response into a friendly text-stream
-  const stream = OpenAIStream(response);
-
-  // Return a StreamingTextResponse, which can be consumed by the client
-  return new StreamingTextResponse(stream);
+    // Return the stream
+    return new Response(textStream);
+  } catch (error) {
+    console.error('Chat API Error:', error);
+    return new Response(JSON.stringify({ error: 'There was an error processing your request' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
 }
