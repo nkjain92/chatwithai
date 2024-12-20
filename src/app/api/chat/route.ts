@@ -1,6 +1,12 @@
 import OpenAI from 'openai';
 import { OpenAIStream, StreamingTextResponse } from 'ai';
 
+// Define the message type
+type Message = {
+  role: 'system' | 'user' | 'assistant';
+  content: string;
+};
+
 // Create an OpenAI API client
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -9,9 +15,13 @@ const openai = new OpenAI({
 // IMPORTANT! Set the runtime to edge
 export const runtime = 'edge';
 
-export async function POST(req: Request) {
+export async function POST(req: Request): Promise<Response> {
   try {
-    const { messages, temperature, model } = await req.json();
+    const { messages, temperature, model } = (await req.json()) as {
+      messages: Message[];
+      temperature?: number;
+      model?: string;
+    };
 
     // Ask OpenAI for a streaming chat completion
     const response = await openai.chat.completions.create({
