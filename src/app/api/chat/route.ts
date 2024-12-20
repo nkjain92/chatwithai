@@ -16,6 +16,13 @@ const openai = new OpenAI({
 export const runtime = 'edge';
 
 export async function POST(req: Request): Promise<Response> {
+  if (!process.env.OPENAI_API_KEY) {
+    return new Response(JSON.stringify({ error: 'OpenAI API key not configured' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
   try {
     const { messages, temperature, model } = (await req.json()) as {
       messages: Message[];
@@ -23,12 +30,22 @@ export async function POST(req: Request): Promise<Response> {
       model?: string;
     };
 
+    if (!messages || !Array.isArray(messages) || messages.length === 0) {
+      return new Response(JSON.stringify({ error: 'Messages are required and must be an array' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
     // Ask OpenAI for a streaming chat completion
     const response = await openai.chat.completions.create({
       model: model || 'gpt-3.5-turbo',
       stream: true,
       temperature: temperature || 0.7,
-      messages,
+      messages: messages.map(message => ({
+        role: message.role,
+        content: message.content,
+      })),
     });
 
     // Transform the response into a friendly text-stream
@@ -38,9 +55,12 @@ export async function POST(req: Request): Promise<Response> {
     return new StreamingTextResponse(stream);
   } catch (error) {
     console.error('Chat API Error:', error);
-    return new Response(JSON.stringify({ error: 'There was an error processing your request' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return new Response(
+      JSON.stringify({
+        error:
+          error instanceof Error ? error.message : 'There was an error processing your request',
+      }),
+      { status: 500, headers: { 'Content-Type': 'application/json' } },
+    );
   }
 }

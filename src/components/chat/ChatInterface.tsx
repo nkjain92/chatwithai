@@ -52,6 +52,19 @@ export const ChatInterface = () => {
       const activeConversation = conversations.find(c => c.id === activeConversationId);
       if (!activeConversation) throw new Error('Conversation not found');
 
+      // Create a single message that we'll update as we receive chunks
+      const assistantMessage = {
+        id: Date.now().toString(),
+        role: 'assistant' as const,
+        content: '',
+        createdAt: new Date().toISOString(),
+      };
+
+      lastMessageRef.current = { userMessage, assistantMessage };
+
+      // Add the initial empty message
+      dispatch(addMessage({ conversationId: activeConversationId, message: assistantMessage }));
+
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: {
@@ -71,24 +84,13 @@ export const ChatInterface = () => {
         throw new Error(errorData.error || 'Failed to fetch response');
       }
 
-      const reader = response.body?.getReader();
+      if (!response.body) {
+        throw new Error('No response body');
+      }
+
+      const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let content = '';
-
-      if (!reader) throw new Error('No response body');
-
-      // Create a single message that we'll update as we receive chunks
-      const assistantMessage = {
-        id: Date.now().toString(),
-        role: 'assistant' as const,
-        content: '',
-        createdAt: new Date().toISOString(),
-      };
-
-      lastMessageRef.current = { userMessage, assistantMessage };
-
-      // Add the initial empty message
-      dispatch(addMessage({ conversationId: activeConversationId, message: assistantMessage }));
 
       while (true) {
         const { done, value } = await reader.read();
