@@ -1,76 +1,45 @@
-import OpenAI from 'openai';
+import { OpenAIStream, StreamingTextResponse } from 'ai';
+import { Configuration, OpenAIApi } from 'openai-edge';
 
-// Create an OpenAI API client
-const openai = new OpenAI({
+// Create an OpenAI API client (that's edge friendly!)
+const config = new Configuration({
   apiKey: process.env.OPENAI_API_KEY,
 });
+const openai = new OpenAIApi(config);
 
-// IMPORTANT! Set the runtime to edge
+// Set the runtime to edge for best performance
 export const runtime = 'edge';
 
 export async function POST(req: Request) {
   try {
-    const { messages, model, temperature, maxTokens, topP } = await req.json();
+    const { messages, temperature, model } = await req.json();
 
-    // Ensure we have at least one message
-    if (!messages || messages.length === 0) {
-      return new Response(
-        JSON.stringify({
-          error: 'Messages array cannot be empty',
-        }),
-        {
-          status: 400,
-          headers: { 'Content-Type': 'application/json' },
-        },
-      );
-    }
-
-    // Ask OpenAI for a streaming chat completion
-    const response = await openai.chat.completions.create({
+    // Ask OpenAI for a streaming chat completion given the prompt
+    const response = await openai.createChatCompletion({
       model: model || 'gpt-3.5-turbo',
       stream: true,
       temperature: temperature || 0.7,
-      max_tokens: maxTokens || 2048,
-      top_p: topP || 1,
-      messages: messages.map((message: any) => ({
+      messages: messages.map((message: { role: string; content: string }) => ({
         role: message.role,
         content: message.content,
       })),
     });
 
-    // Create a TransformStream for handling the response
-    const encoder = new TextEncoder();
-    const decoder = new TextDecoder();
+    // Convert the response into a friendly text-stream
+    const stream = OpenAIStream(response);
 
-    const stream = new ReadableStream({
-      async start(controller) {
-        for await (const chunk of response) {
-          const content = chunk.choices[0]?.delta?.content || '';
-          if (content) {
-            controller.enqueue(encoder.encode(content));
-          }
-        }
-        controller.close();
-      },
-    });
-
-    // Return a streaming response
-    return new Response(stream, {
-      headers: {
-        'Content-Type': 'text/plain; charset=utf-8',
-        'Transfer-Encoding': 'chunked',
-      },
-    });
+    // Respond with the stream
+    return new StreamingTextResponse(stream);
   } catch (error) {
-    console.error('Chat API Error:', error);
-    return new Response(
-      JSON.stringify({
-        error: 'There was an error processing your request',
-      }),
-      {
+    if (error instanceof Error) {
+      return new Response(JSON.stringify({ error: error.message }), {
         status: 500,
         headers: { 'Content-Type': 'application/json' },
-      },
-    );
+      });
+    }
+    return new Response(JSON.stringify({ error: 'An unknown error occurred' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
   }
 }
